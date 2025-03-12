@@ -1,43 +1,73 @@
 import csv
 import time
-from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import ssl
-ssl._create_default_https_context = ssl._create_unverified_context
 import nltk
+
+# SSL Fix for NLTK downloads
+ssl._create_default_https_context = ssl._create_unverified_context
 nltk.download('vader_lexicon')
 
-def scrape_google_news(company, start_date, end_date, driver):
+def click_next_page(driver):
     """
-    Scrape Google News headlines for a given company between start_date and end_date.
-    Dates should be in MM/DD/YYYY format.
-    Implements pagination by clicking the "Next" button.
+    Attempt to click the "Next" button (id='pnnext') on Google News search results.
+    Returns True if successful, False otherwise.
+    """
+    try:
+        # Wait for the next button to be clickable
+        next_button = WebDriverWait(driver, 5).until(
+            EC.element_to_be_clickable((By.ID, "pnnext"))
+        )
+        next_button.click()
+        time.sleep(2)  # Allow time for the next page to load
+        return True
+    except Exception as e:
+        print("Next page not found or not clickable:", e)
+        return False
+
+def scrape_google_news(company, driver):
+    """
+    Scrape Google News headlines for a given company using a date range.
+    Uses Google search with tbm=nws and tbs parameters to filter news between 2022 and 2024.
+    Iterates through pages using the "Next" button.
     """
     query = company.replace(" ", "+")
-    url = f"https://www.google.com/search?q={query}&tbm=nws&tbs=cdr:1,cd_min:{start_date},cd_max:{end_date}"
+    # URL with date range filtering: 01/01/2022 to 12/31/2024
+    url = f"https://www.google.com/search?q={query}&tbm=nws&tbs=cdr:1,cd_min:01/01/2022,cd_max:12/31/2024"
     driver.get(url)
-    time.sleep(3)  # Wait for the first page to load
-
+    time.sleep(2)  # Wait for the page to load
+    
     headlines = set()
-    # List of selectors to try. You can add more if needed.
+    # Selectors known to capture headlines on Google News search results
     selectors = [
         "a.WlydOe",          # Primary headline link
-        "div.JheGif.nDgy9d",  # Alternative headline container
-        "div.dbsr"           # Overall container; will extract inner headline text if available
+        "div.JheGif.nDgy9d",  # Headline container
+        "div.dbsr"           # Overall container; extract headline text inside it
     ]
     
-    # Loop through all pages using pagination
+    page_number = 1
     while True:
-        # Try each selector on the current page
+        print(f"Scraping page {page_number} for {company}...")
+        try:
+            WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "div.dbsr"))
+            )
+        except Exception as e:
+            print(f"Error waiting for articles for {company} on page {page_number}: {e}")
+        
+        time.sleep(2)  # Extra wait to ensure content is loaded
+        
         for sel in selectors:
             try:
                 elements = driver.find_elements(By.CSS_SELECTOR, sel)
                 for elem in elements:
-                    # For container elements, try to extract a specific headline child
+                    # For overall container, try to extract child headline element
                     if sel == "div.dbsr":
                         try:
                             title_elem = elem.find_element(By.CSS_SELECTOR, "div.JheGif.nDgy9d")
@@ -49,22 +79,19 @@ def scrape_google_news(company, start_date, end_date, driver):
                     if text:
                         headlines.add(text)
             except Exception as e:
-                print(f"Error with selector {sel}: {e}")
-
-        # Try to locate and click the "Next" button
-        try:
-            next_button = driver.find_element(By.ID, "pnnext")
-            next_button.click()
-            time.sleep(3)  # Wait for the next page to load
-        except Exception:
-            # No next button found, exit pagination loop
+                print(f"Error with selector {sel} for {company} on page {page_number}: {e}")
+        
+        # Attempt to click the next page; if not found, exit loop
+        if not click_next_page(driver):
             break
-
+        
+        page_number += 1
+    
     return list(headlines)
 
 def analyze_sentiment(headlines):
     """
-    Analyze sentiment of each headline using VADER and return a list of dictionaries.
+    Analyze sentiment of each headline using VADER.
     """
     sid = SentimentIntensityAnalyzer()
     results = []
@@ -74,49 +101,61 @@ def analyze_sentiment(headlines):
         results.append({"headline": headline, "sentiment": compound_score})
     return results
 
-def save_to_csv(company, results, filename):
+def save_to_csv(company, results):
     """
-    Save the sentiment results to a CSV file.
+    Save sentiment results to a CSV file.
     """
+    filename = f"{company.replace(' ', '_')}_news_sentiment.csv"
     with open(filename, mode="w", newline='', encoding="utf-8") as csv_file:
         fieldnames = ["company", "headline", "sentiment"]
         writer = csv.DictWriter(csv_file, fieldnames=fieldnames)
         writer.writeheader()
         for result in results:
-            writer.writerow({"company": company, "headline": result["headline"], "sentiment": result["sentiment"]})
+            writer.writerow({
+                "company": company,
+                "headline": result["headline"],
+                "sentiment": result["sentiment"]
+            })
+    print(f"Data saved to {filename}")
 
 def main():
-    # Configure Chrome options for Selenium
+    # Configure Chrome options
     chrome_options = Options()
-    chrome_options.add_argument("--headless")  # Run headless if you don't need a browser UI
-    # Optional: Add a user-agent to mimic a real browser
-    chrome_options.add_argument("user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/99.0.4844.51 Safari/537.36")
+    chrome_options.add_argument("--headless")  # Remove if you want to see the browser
+    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    # Use a full desktop user agent string to mimic a real browser
+    chrome_options.add_argument("--user-agent=Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) " \
+                                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.5304.87 Safari/537.36")
     
-    # Set up ChromeDriver (update the path to the chromedriver executable)
+    # Set up ChromeDriver (update the path as needed)
     service = Service("/Users/wongyule/Documents/Designing Intelligent Agents/FinancialTradingBot/chromedriver-mac-arm64/chromedriver")
     driver = webdriver.Chrome(service=service, options=chrome_options)
-    
-    # Define parameters for scraping
-    company = "Apple Inc"
-    # Date format must be MM/DD/YYYY
-    start_date = "01/01/2022"
-    end_date = "01/07/2022"
-    
-    # Scrape headlines from Google News with pagination
-    headlines = scrape_google_news(company, start_date, end_date, driver)
-    if not headlines:
-        print("No headlines found!")
-        driver.quit()
-        return
-    
-    # Analyze sentiment for the extracted headlines
-    results = analyze_sentiment(headlines)
-    
-    # Save the results to a CSV file
-    filename = f"{company.replace(' ', '_')}_news_sentiment.csv"
-    save_to_csv(company, results, filename)
-    print(f"Data saved to {filename}")
-    
+
+    # List of companies from the Dow Jones portfolio
+    companies = [
+        "3M Corporation", "American Express Company", "Travellers Companies Inc.", "Visa Inc.",
+        "JP Morgan Chase & Co.", "Goldman Sachs Group Inc.", "Apple Inc.", "Microsoft Corporation",
+        "Intel Corporation", "IBM Corporation", "Cisco Systems Inc.", "Boeing Corporation",
+        "Raytheon Technologies Corporation", "Caterpillar Inc.", "Chevron Corporation",
+        "Exxon Mobil Corporation", "McDonalds Corporation", "Coca-Cola Corporation",
+        "Johnson & Johnson Corporation", "Pfizer Inc", "Merck & Co. Inc.", "DuPont de Nemours Inc",
+        "Walgreens Boots Alliance Inc.", "Walmart Inc.", "Home Depot Inc.", "Nike Inc.",
+        "UnitedHealth Group Inc.", "Proctor & Gamble Corporation", "Verizon Communications Inc.",
+        "Walt Disney Company"
+    ]
+
+    for company in companies:
+        print(f"Scraping news for {company}...")
+        headlines = scrape_google_news(company, driver)
+        if not headlines:
+            print(f"No headlines found for {company}")
+            continue
+
+        # Perform sentiment analysis
+        results = analyze_sentiment(headlines)
+        # Save results to CSV file
+        save_to_csv(company, results)
+
     driver.quit()
 
 if __name__ == "__main__":
