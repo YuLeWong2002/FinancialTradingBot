@@ -4,15 +4,17 @@ This project contains a full pipeline for building a stock trading agent, includ
 
 # 🗂 Project Structure
 
-File	Description
-Data_Preprocess.ipynb	Preprocesses raw stock market data (e.g., calculates technical indicators, cleans data, prepares training features).
-Forecasting_Models.ipynb	Trains forecasting models (such as XGBoost, LSTM, or Prophet) to predict stock market trends or next-day closing prices.
-Simulation.ipynb	Simulates stock trading based on forecasted prices, testing different trading strategies and evaluating portfolio performance.
+Data_Preprocess.ipynb:	Preprocesses raw stock market data (e.g., calculates technical indicators, cleans data, prepares training features).
+
+Forecasting_Models.ipynb:	Trains forecasting models (such as XGBoost, LSTM, or Prophet) to predict stock market trends or next-day closing prices.
+
+Simulation.ipynb:	Simulates stock trading based on forecasted prices, testing different trading strategies and evaluating portfolio performance.
 
 # 🚀 How to Run
 Clone this repository:
 
 git clone https://github.com/YuLeWong2002/FinancialTradingBot.git
+
 cd FinancialTradingBot
 
 Install required dependencies
