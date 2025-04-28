@@ -20,11 +20,13 @@ Clone this repository:
 ```bash
 git clone https://github.com/YuLeWong2002/FinancialTradingBot.git
 cd FinancialTradingBot
+```
 
 Install required dependencies:
 
 ```bash
 pip install -r requirements.txt
+```
 
 Run the notebooks sequentially:
 
