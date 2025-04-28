@@ -20,3 +20,19 @@ Clone this repository:
 ```bash
 git clone https://github.com/YuLeWong2002/FinancialTradingBot.git
 cd FinancialTradingBot
+
+Install required dependencies:
+
+```bash
+pip install -r requirements.txt
+
+Run the notebooks sequentially:
+
+- Start with Data_Preprocess.ipynb to generate clean input data.
+- Train forecasting models with Forecasting_Models.ipynb.
+- Simulate trading strategies with Simulation.ipynb.
+- Run full agent evaluation in Final Agent.ipynb.
+
+# 📜 License
+
+This project is for educational and research purposes only.
