@@ -33,7 +33,7 @@ Run the notebooks sequentially:
 - Start with Data_Preprocess.ipynb to generate clean input data.
 - Train forecasting models with Forecasting_Models.ipynb.
 - Simulate trading strategies with Simulation.ipynb.
-- Run full agent evaluation in Final Agent.ipynb.
+- Run full agent evaluation in FinalAgent.ipynb.
 
 # 📜 License
 
